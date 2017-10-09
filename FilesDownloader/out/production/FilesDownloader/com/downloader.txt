@@ -1,0 +1,73 @@
+package com.company;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+
+/**
+ * Created by владелец on 27.04.2017.
+ */
+public class Downloader extends Thread  {
+    private URL loadedFile;
+    private File downloadedPath;
+    private ListenerOfDownloader listener;
+
+    public Downloader(String reference, String path, ListenerOfDownloader listener)throws Exception{
+        addListener(listener);
+        try {
+            loadedFile = new URL(reference);
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+        downloadedPath = new File(path);
+        try {
+            downloadedPath.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        this.start();
+    }
+
+    public void addListener(ListenerOfDownloader listener){
+        this.listener = listener;
+    }
+
+    private void downloadFile(){
+        try {
+            Calendar calendar = new GregorianCalendar();
+            long timeExecutionInMillis= calendar.getTimeInMillis();
+            HttpURLConnection connection = (HttpURLConnection)loadedFile.openConnection();
+            connection.connect();
+            BufferedInputStream input = new BufferedInputStream(connection.getInputStream());
+            FileOutputStream output = new FileOutputStream(downloadedPath);
+
+            byte[] buffer = new byte[1024];
+            int intRead = 0;
+            long readBytes = 0;
+            while((intRead= input.read(buffer))!= -1) {
+                output.write(buffer, 0, intRead);
+                readBytes += intRead;
+            }
+
+            output.flush();
+            input.close();
+            connection.disconnect();
+            calendar = new GregorianCalendar();
+            timeExecutionInMillis = calendar.getTimeInMillis() - timeExecutionInMillis;
+            listener.onDownload(new InfoAboutDownloadedFile(loadedFile.getPath(), downloadedPath.getName(), readBytes, timeExecutionInMillis));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        listener.addDownload();
+        downloadFile();
+        listener.releaseDownload();
+    }
+}
